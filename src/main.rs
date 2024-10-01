@@ -6,6 +6,7 @@ fn main() {
     println!("this is of seed : {:?}", mnemonic.get_pharse());
     let seed = &mnemonic.to_seed("");
     let key = derivation::ExtendedKey::derive_from_path(*seed, "m/44'/0'/0'/0").unwrap();
-    key.serialize_xprv();
-    key.serialize_xpub();
+    let message_data = b"Hello, world!";
+    let sign = key.sign(message_data);
+    key.verify(message_data, sign).expect("fail to verify sign");
 }

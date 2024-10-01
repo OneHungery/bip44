@@ -2,13 +2,14 @@ use crate::mnemonic::Seed;
 use hmac::digest::generic_array::GenericArray;
 use hmac::Hmac;
 use hmac::Mac;
+use secp256k1::ecdsa::Signature;
 use sha2::Sha512;
 pub type PrivateKey = [u8; 32];
 pub type ChainCode = [u8; 32];
 use k256::elliptic_curve::PrimeField;
 use k256::Scalar;
 type HmacSha512 = Hmac<Sha512>;
-use secp256k1::{PublicKey, Secp256k1, SecretKey};
+use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
 type KeyFingerprint = [u8; 4];
 const DERIVATION_RANGE: u32 = 1 << 31;
 use base58::ToBase58;
@@ -271,5 +272,27 @@ impl ExtendedKey {
 
         let xprv_base58 = xprv_data.to_base58();
         println!("Base58Check Encoded xprv: {}", xprv_base58);
+    }
+
+    pub fn sign(&self, message: &[u8]) -> Signature {
+        let message = Self::new_message(message);
+        let secret_key = SecretKey::from_slice(&self.private_key).unwrap();
+        let secp = Secp256k1::new();
+        secp.sign_ecdsa(&message, &secret_key)
+    }
+
+    pub fn verify(&self, message: &[u8], sign: Signature) -> anyhow::Result<()> {
+        let secp = Secp256k1::new();
+        let message = Self::new_message(message);
+        secp.verify_ecdsa(&message, &sign, &self.public_key())
+            .unwrap();
+        Ok(())
+    }
+
+    fn new_message(message: &[u8]) -> Message {
+        let mut hasher = Sha256::new();
+        hasher.update(message);
+        let message_hash = hasher.finalize();
+        Message::from_digest_slice(&message_hash).expect("消息哈希必须是 32 字节")
     }
 }
